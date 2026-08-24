@@ -897,7 +897,7 @@ function sinh(){
   const b0 = hi-lo, L0 = lo-b0*0.2, W0 = b0*1.4;
   const k = {q, lo, hi, px: v => Math.max(0, Math.min(100, (v-L0)/W0*100))};
 
-  const h = {c, k, pts,
+  const h = {c, k, pts, stt,
     poly: L.polyline(pts, {color:'#0072B2', weight:3, opacity:.22}).addTo(map),
     daDi: L.polyline([pts[0]], {color:'#0072B2', weight:4.5, opacity:.85}).addTo(map),
     mA: L.circleMarker(a, {radius:5, color:'#009E73', weight:2.5,
@@ -920,7 +920,8 @@ function ketThuc(h){
            gio:h.c.gio, tt:h.c.tt, km:h.c.km, pers:h.c.pers,
            hs_p:h.c.hs_p, hs_y:h.c.hs_y,
            /* Nam truong duoi chi de DUNG LAI nhat ky khi xem lai ban da luu */
-           t:h.c.t, don:h.c.don, tra:h.c.tra, xe:h.c.xe, base_p:h.c.base_p});
+           t:h.c.t, don:h.c.don, tra:h.c.tra, xe:h.c.xe, base_p:h.c.base_p,
+           stt:h.stt});
   /* Cong don rieng: LS chi giu 400 chuyen gan nhat nen khong dung lam nguon
      cho tab "da chay" duoc — chay 1000 chuyen se ve tu 400.                 */
   themChuyenDaChay(h.c);
@@ -978,6 +979,21 @@ function dongLog(c, lo, hi){
       (lech >= 0 ? '+' : '−') + pct(Math.abs(lech)) + '</span>' +
     '<span style="color:' + (trong ? 'var(--green)' : 'var(--red)') + ';font-size:11.5px">' +
       (trong ? 'trong khoảng' : (c.y > hi ? 'vượt trên' : 'thấp hơn')) + '</span>';
+}
+
+/* Ve lai vet duong tren ban do tu LS. Toa do khong duoc luu — tinh lai tu
+   chi so chuyen, vi ham rai diem la tat dinh theo hat giong do.          */
+function veLaiVet(){
+  hd.forEach(xoaLop); hd = [];
+  veo.forEach(l => map.removeLayer(l)); veo = [];
+  LS.slice(-14).forEach(o => {
+    if (o.stt == null || !o.don || !o.tra) return;
+    const a = diemTrongVung(o.don, o.stt*7919 + 13);
+    const b = diemTrongVung(o.tra, o.stt*7919 + 977);
+    const trong = o.y >= o.lo && o.y <= o.hi;
+    veo.push(L.polyline(duongCong(a, b),
+      {color: trong ? '#009E73' : '#D55E00', opacity:.18, weight:2.5}).addTo(map));
+  });
 }
 
 /* Ve lai toan bo nhat ky tu LS — dung khi doi qua lai giua ban dang chay va
@@ -2110,7 +2126,7 @@ function napTrangThai(goc){
   GIO_TU = a.GIO_TU; GIO_DEN = a.GIO_DEN; THU = a.THU; DUNG_SAU = a.DUNG_SAU;
   /* Xoa bo nho dem cua hai tab nhip gia, neu khong chung se ve lai so cu */
   Object.keys(NHIP).forEach(k => { NHIP[k].B = null; NHIP[k].hl = null; });
-  veStats(); veCard(null); veBieuDo(); veLaiLog();
+  veStats(); veCard(null); veBieuDo(); veLaiLog(); veLaiVet();
 }
 
 function veBangXemLai(){
