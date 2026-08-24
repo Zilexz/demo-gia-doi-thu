@@ -2065,6 +2065,44 @@ let CHON_LUU = new Set();
    ra hai ban trung so, va so sanh se chon nham ban.                          */
 let STT_LUU = 0;
 
+/* ══ Giu ban da luu qua cac lan mo lai trang ══════════════════════════
+   localStorage cho khoang 5 MB moi trang, ma moi ban luu keo theo anh chup
+   (toi 400 chuyen + 288 o gio) nen chi vai ban la day. Khi day thi bo anh
+   chup cua ban CU NHAT truoc: hang so lieu van con nguyen, chi mat kha nang
+   bam vao xem lai dung ban do.                                             */
+const KHOA_LUU = 'demo_gia_ban_luu_v1';
+let LUU_DUOC = true;      // trinh duyet co cho ghi khong
+let BO_ANH = 0;           // bao nhieu ban da phai bo anh chup cho vua cho
+
+function ghiBanLuu(){
+  const ds = BAN_LUU.map(b => Object.assign({}, b));
+  for (let i = 0; i <= ds.length; i++){
+    try {
+      localStorage.setItem(KHOA_LUU, JSON.stringify({stt: STT_LUU, ds: ds}));
+      LUU_DUOC = true; BO_ANH = i; return;
+    } catch(e){
+      if (i >= ds.length){                   // van khong vua: thoi khong luu
+        try { localStorage.removeItem(KHOA_LUU); } catch(_){}
+        LUU_DUOC = false; BO_ANH = 0; return;
+      }
+      ds[i] = Object.assign({}, ds[i]);
+      delete ds[i].anh;                      // bo anh chup ban cu nhat
+    }
+  }
+}
+
+function docBanLuu(){
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(KHOA_LUU) || 'null'); }
+  catch(e){ LUU_DUOC = false; return; }
+  if (!d || !Array.isArray(d.ds) || !d.ds.length) return;
+  BAN_LUU = d.ds;
+  STT_LUU = d.stt || BAN_LUU.reduce((m, b) => Math.max(m, b.stt || 0), 0);
+  BO_ANH = BAN_LUU.filter(b => !b.anh).length;
+  document.getElementById('so-luu').textContent = BAN_LUU.length;
+  veBangLuu();
+}
+
 function luuBanChay(){
   if (!S.n){
     document.getElementById('ket-qua').innerHTML =
@@ -2092,6 +2130,7 @@ function luuBanChay(){
       GIO_TU: GIO_TU, GIO_DEN: GIO_DEN, THU: THU, DUNG_SAU: DUNG_SAU
     },
   });
+  ghiBanLuu();
   document.getElementById('so-luu').textContent = BAN_LUU.length;
   veBangLuu();
   document.getElementById('ket-qua').innerHTML =
@@ -2261,7 +2300,12 @@ function capNhatDemLuu(){
   document.getElementById('bd-luu-ct').innerHTML =
     BAN_LUU.length + ' bản · ' + CHON_LUU.size + ' đang chọn · ' +
     '<span style="color:var(--green)">xanh</span> = coverage đạt mức đã hứa'
-    + (nhom_gio > 1 ? ' · <b>' + nhom_gio + ' khung giờ khác nhau</b>' : '');
+    + (nhom_gio > 1 ? ' · <b>' + nhom_gio + ' khung giờ khác nhau</b>' : '')
+    + (!LUU_DUOC
+        ? ' · <b style="color:var(--orange)">trình duyệt không cho lưu, mất khi tải lại</b>'
+        : BO_ANH
+        ? ' · <b style="color:var(--orange)">' + BO_ANH + ' bản cũ nhất chỉ còn số liệu</b>'
+        : ' · <span style="color:var(--mut)">giữ lại khi tải lại trang</span>');
   capNhatNutSS();
 }
 
@@ -2425,6 +2469,7 @@ function xoaBanChon(){
   if (!CHON_LUU.size) return;
   BAN_LUU = BAN_LUU.filter(b => !CHON_LUU.has(b.stt));
   CHON_LUU.clear();
+  ghiBanLuu();
   document.getElementById('so-luu').textContent = BAN_LUU.length;
   document.getElementById('the-ss').hidden = true;
   veBangLuu();
@@ -2729,6 +2774,7 @@ document.getElementById('c-mae').textContent = vnd(CH.mae) + 'đ';
 document.getElementById('c-n').textContent   = TAT_CA.length.toLocaleString('vi-VN');
 locNguon();
 veGhiChu();
+docBanLuu();
 doiBang('nhip-gio');
 reset();
 </script>
