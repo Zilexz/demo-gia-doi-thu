@@ -101,6 +101,20 @@ body.trai-dai .bd-hang.nhip .bang-cuon{height:clamp(190px,24vh,300px)}
 .nut-ss:disabled{background:var(--card);border-color:var(--line);color:#b9c3ce;cursor:default}
 .nut-ss.phu{background:var(--card);border-color:var(--line);color:var(--mut)}
 .nut-ss.phu:hover{border-color:#c2ccd9;color:var(--ink)}
+.bang-cuon tr.bam-duoc{cursor:pointer}
+.bang-cuon tr.bam-duoc:hover td{background:#f2f7fc}
+.bang-cuon tr.dang-xem td{background:#e4f0fb;box-shadow:inset 3px 0 0 var(--blue)}
+.bang-xem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px;
+  padding:7px 11px;border:1px solid #bcd9f2;background:#eaf4fd;border-radius:8px}
+.bang-xem .nhan-xem{font-size:10.5px;font-weight:700;letter-spacing:.5px;
+  color:var(--blue);white-space:nowrap}
+.bang-xem .ct-xem{font-size:11.5px;color:var(--mut)}
+.bang-xem .nut-ss{margin-left:auto}
+body.dang-xem-lai .nk{outline:2px solid #bcd9f2;outline-offset:2px;border-radius:10px}
+.log-xem{display:none;padding:16px 4px;font-size:13px;color:var(--mut)}
+body.dang-xem-lai #log,
+body.dang-xem-lai .lr.dau{display:none}
+body.dang-xem-lai .log-xem{display:block}
 .bang-cuon th.ck,.bang-cuon td.ck{width:22px;text-align:center;padding-left:2px}
 .bang-cuon td.ck input{cursor:pointer;margin:0;vertical-align:middle}
 .bd{min-height:0}
@@ -126,6 +140,8 @@ aside{grid-column:2;grid-row:1/3;min-height:0}
 }
 
 /* Ba bieu do duoi ban do */
+/* [hidden] phai thang display:flex ben duoi, khong thi the an van hien */
+.bd[hidden]{display:none}
 .bd{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 11px;
   display:flex;flex-direction:column;min-width:0}
 /* Tieu de va chu thich xep THANH HAI DONG co chieu cao co dinh.
@@ -407,6 +423,7 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
       <div class="bd">
         <h3><span class="tt">Các bản chạy đã lưu</span>
           <em id="bd-luu-ct">bấm 💾 Lưu bản chạy để thêm</em></h3>
+        <div class="bang-xem" id="bang-xem" hidden></div>
         <div class="luu-thanh" id="luu-thanh" hidden>
           <button class="nut-ss" id="nut-sosanh" type="button" disabled>⇄ So sánh</button>
           <button class="nut-ss phu" id="nut-bo-chon" type="button">Bỏ chọn</button>
@@ -544,6 +561,8 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
     <span class="r">Giá thật</span><span class="r">Lệch</span><span>Kết quả</span>
   </div>
   <div id="log"></div>
+  <div class="log-xem" id="log-xem">Nhật ký chỉ ghi cho <b>bản đang chạy</b>.
+    Số liệu và biểu đồ phía trên là của bản đã lưu bạn đang xem — quay lại để thấy nhật ký.</div>
 </div>
 
 <script>
@@ -2001,6 +2020,15 @@ function luuBanChay(){
     muc: MUC, hc: HC === 'band' ? 'theo band' : 'q chung',
     n: S.n, cov: S.trong/S.n, sai: S.sai/S.n, rong: S.rong/S.n,
     hs: S.sai_hs/S.n, bl: S.sai_bl/S.n, tren: S.tren, duoi: S.duoi,
+    /* Anh chup de XEM LAI. Khong co ba thu nay thi chi doc duoc hang so,
+       khong ve lai duoc bieu do cua lan chay do.                        */
+    anh: {
+      LS: LS.map(o => Object.assign({}, o)),
+      S:  Object.assign({}, S),
+      G:  G_CHAY.map(o => Object.assign({}, o, {tt: Object.assign({}, o.tt)})),
+      MUC: MUC, HC: HC, NHOM: NHOM,
+      GIO_TU: GIO_TU, GIO_DEN: GIO_DEN, THU: THU, DUNG_SAU: DUNG_SAU
+    },
   });
   document.getElementById('so-luu').textContent = BAN_LUU.length;
   veBangLuu();
@@ -2013,6 +2041,91 @@ function luuBanChay(){
 const khoaGio = b => b.gio_tu + '-' + b.gio_den;      // hai ban so duoc khi trung khoa nay
 const banTheoStt = s => BAN_LUU.find(b => b.stt === s);
 const honBaseline = b => b.bl > 0 ? 1 - b.sai/b.bl : 0;
+
+/* ══ Xem lại một bản đã lưu ═══════════════════════════════════════════
+   Bấm vào một hàng -> nạp lại nguyên trạng thái của lần chạy đó (từng
+   chuyến, thống kê, ô giờ) rồi vẽ lại mọi biểu đồ. Bản đang chạy thật được
+   cất riêng nên quay lại là có đủ, không mất gì.                        */
+let XEM_LAI = null;      // stt dang xem · null = dang o ban chay that
+let BAN_SONG = null;     // cat giu ban that trong luc xem lai
+
+/* Dung han: bam nut tam dung thoi chua du, requestAnimationFrame van con
+   mot khung nua va khung do se ghi them mot chuyen vao trang thai.         */
+function dungHan(){
+  if (loop != null){ cancelAnimationFrame(loop); loop = null; }
+  dangChay = false;
+  const b = document.getElementById('btn-play');
+  if (b) b.textContent = '▶ Chạy liên tục';
+}
+
+const chupSong = () => ({
+  LS: LS, S: S, G: G_CHAY, MUC: MUC, HC: HC, NHOM: NHOM,
+  GIO_TU: GIO_TU, GIO_DEN: GIO_DEN, THU: THU, DUNG_SAU: DUNG_SAU
+});
+
+/* Luon nhan ban truoc khi nap. Nap thang doi tuong da luu thi mot chuyen
+   con dang chay do se cong vao chinh no va lam hong ban luu vinh vien.     */
+const nhanBan = a => ({
+  LS: a.LS.map(o => Object.assign({}, o)),
+  S:  Object.assign({}, a.S),
+  G:  a.G.map(o => Object.assign({}, o, {tt: Object.assign({}, o.tt)})),
+  MUC: a.MUC, HC: a.HC, NHOM: a.NHOM,
+  GIO_TU: a.GIO_TU, GIO_DEN: a.GIO_DEN, THU: a.THU, DUNG_SAU: a.DUNG_SAU
+});
+
+function napTrangThai(goc){
+  const a = nhanBan(goc);
+  LS = a.LS; S = a.S; G_CHAY = a.G;
+  MUC = a.MUC; HC = a.HC; NHOM = a.NHOM;
+  GIO_TU = a.GIO_TU; GIO_DEN = a.GIO_DEN; THU = a.THU; DUNG_SAU = a.DUNG_SAU;
+  /* Xoa bo nho dem cua hai tab nhip gia, neu khong chung se ve lai so cu */
+  Object.keys(NHIP).forEach(k => { NHIP[k].B = null; NHIP[k].hl = null; });
+  veStats(); veCard(null); veBieuDo();
+}
+
+function veBangXemLai(){
+  const b = XEM_LAI == null ? null : banTheoStt(XEM_LAI);
+  const o = document.getElementById('bang-xem');
+  if (!o) return;
+  o.hidden = !b;
+  if (!b) return;
+  o.innerHTML =
+    '<span class="nhan-xem">ĐANG XEM LẠI BẢN #' + b.stt + '</span>' +
+    '<span class="ct-xem">' + b.nhom + ' · ' + b.ten_gio + ' · ' + b.ten_thu +
+    ' · mức ' + pct(b.muc) + ' · ' + b.hc + ' · <b>' + b.n + '</b> chuyến</span>' +
+    '<button class="nut-ss phu" id="nut-thoat-xem" type="button">← Quay lại bản đang chạy</button>';
+  document.getElementById('nut-thoat-xem').onclick = thoatXemLai;
+}
+
+function xemBanLuu(stt){
+  const b = banTheoStt(stt);
+  if (!b || !b.anh) return;
+  if (XEM_LAI === stt) return thoatXemLai();   // bam lai chinh no = thoat
+  dungHan();
+  if (XEM_LAI == null) BAN_SONG = chupSong();  // chi cat mot lan
+  XEM_LAI = stt;
+  napTrangThai(b.anh);
+  document.body.classList.add('dang-xem-lai');
+  veBangXemLai();
+  veBangLuu();
+  document.getElementById('ket-qua').innerHTML =
+    '<b style="color:var(--blue)">Đang xem lại bản #' + stt + '</b> — ' +
+    b.n + ' chuyến, ' + b.ten_gio + ' · ' + b.ten_thu +
+    '.<br><span style="color:var(--mut)">Mọi biểu đồ đang là của lần chạy này. ' +
+    'Bấm <b>← Quay lại</b> để về bản đang chạy.</span>';
+}
+
+function thoatXemLai(){
+  if (XEM_LAI == null) return;
+  XEM_LAI = null;
+  if (BAN_SONG) napTrangThai(BAN_SONG);
+  BAN_SONG = null;
+  document.body.classList.remove('dang-xem-lai');
+  veBangXemLai();
+  veBangLuu();
+  document.getElementById('ket-qua').innerHTML =
+    '<span style="color:var(--mut)">Đã quay lại bản đang chạy.</span>';
+}
 
 /* ── Bảng danh sách bản đã lưu ────────────────────────────────────── */
 function veBangLuu(){
@@ -2037,7 +2150,11 @@ function veBangLuu(){
   BAN_LUU.forEach(b => {
     const dat = Math.abs(b.cov - b.muc) <= 1.96*Math.sqrt(b.muc*(1-b.muc)/b.n);
     const chon = CHON_LUU.has(b.stt);
-    h.push('<tr' + (chon ? ' class="chon"' : '') + '>' +
+    const lop = (b.anh ? 'bam-duoc ' : '') + (chon ? 'chon ' : '')
+              + (XEM_LAI === b.stt ? 'dang-xem' : '');
+    h.push('<tr' + (lop.trim() ? ' class="' + lop.trim() + '"' : '')
+         + (b.anh ? ' title="Bấm để xem lại toàn bộ biểu đồ của bản chạy này"' : '')
+         + '>' +
       '<td class="ck"><input type="checkbox" class="ck-luu" data-stt="' + b.stt + '"' +
         (chon ? ' checked' : '') + '></td>' +
       '<td>' + b.stt + '</td><td>' + b.nhom + '</td>' +
@@ -2236,6 +2353,14 @@ function xoaBanChon(){
     if (tr) tr.classList.toggle('chon', o.checked);
     document.getElementById('the-ss').hidden = true;
     capNhatDemLuu();
+  });
+  /* Bam vao hang (tru o checkbox) -> xem lai ban do */
+  if (b) b.addEventListener('click', e => {
+    if (e.target.closest('td.ck')) return;
+    const tr = e.target.closest('tr');
+    if (!tr || !tr.classList.contains('bam-duoc')) return;
+    const ck = tr.querySelector('.ck-luu');
+    if (ck) xemBanLuu(+ck.dataset.stt);
   });
   const g = (id, fn) => { const e = document.getElementById(id); if (e) e.addEventListener('click', fn); };
   g('nut-sosanh', soSanhLuu);
@@ -2444,6 +2569,8 @@ document.getElementById('thu-gon').onclick = function(){
 
 /* ── Sự kiện ────────────────────────────────────────────────────────── */
 document.getElementById('btn-play').onclick = function(){
+  // Dang xem lai ma bam Chay -> ve ban that truoc, khong ghi de anh chup
+  if (XEM_LAI != null) thoatXemLai();
   // Het chuyen that su -> bam tiep cung khong chay duoc, noi ro thay vi im lang
   if (!dangChay && hetMau()){
     document.getElementById('ket-qua').innerHTML =
