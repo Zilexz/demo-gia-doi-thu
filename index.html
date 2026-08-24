@@ -104,6 +104,9 @@ body.trai-dai .bd-hang.nhip .bang-cuon{height:clamp(190px,24vh,300px)}
 .bang-cuon tr.bam-duoc{cursor:pointer}
 .bang-cuon tr.bam-duoc:hover td{background:#f2f7fc}
 .bang-cuon tr.dang-xem td{background:#e4f0fb;box-shadow:inset 3px 0 0 var(--blue)}
+/* Khong co hai dong nay thi [hidden] thua display:flex ben duoi, banner
+   va thanh nut cu dung do sau khi da an.                                */
+.bang-xem[hidden],.luu-thanh[hidden]{display:none}
 .bang-xem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px;
   padding:7px 11px;border:1px solid #bcd9f2;background:#eaf4fd;border-radius:8px}
 .bang-xem .nhan-xem{font-size:10.5px;font-weight:700;letter-spacing:.5px;
@@ -112,9 +115,8 @@ body.trai-dai .bd-hang.nhip .bang-cuon{height:clamp(190px,24vh,300px)}
 .bang-xem .nut-ss{margin-left:auto}
 body.dang-xem-lai .nk{outline:2px solid #bcd9f2;outline-offset:2px;border-radius:10px}
 .log-xem{display:none;padding:16px 4px;font-size:13px;color:var(--mut)}
-body.dang-xem-lai #log,
-body.dang-xem-lai .lr.dau{display:none}
-body.dang-xem-lai .log-xem{display:block}
+/* Nhat ky gio dung lai duoc tu du lieu da luu nen khong an nua */
+body.dang-xem-lai .nk-dau b::after{content:' — bản đã lưu';color:var(--blue)}
 .bang-cuon th.ck,.bang-cuon td.ck{width:22px;text-align:center;padding-left:2px}
 .bang-cuon td.ck input{cursor:pointer;margin:0;vertical-align:middle}
 .bd{min-height:0}
@@ -561,8 +563,6 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
     <span class="r">Giá thật</span><span class="r">Lệch</span><span>Kết quả</span>
   </div>
   <div id="log"></div>
-  <div class="log-xem" id="log-xem">Nhật ký chỉ ghi cho <b>bản đang chạy</b>.
-    Số liệu và biểu đồ phía trên là của bản đã lưu bạn đang xem — quay lại để thấy nhật ký.</div>
 </div>
 
 <script>
@@ -918,7 +918,9 @@ function ketThuc(h){
   const trong = h.c.y >= h.k.lo && h.c.y <= h.k.hi;
   LS.push({p:h.c.p, y:h.c.y, lo:h.k.lo, hi:h.k.hi, q:h.k.q,
            gio:h.c.gio, tt:h.c.tt, km:h.c.km, pers:h.c.pers,
-           hs_p:h.c.hs_p, hs_y:h.c.hs_y});
+           hs_p:h.c.hs_p, hs_y:h.c.hs_y,
+           /* Nam truong duoi chi de DUNG LAI nhat ky khi xem lai ban da luu */
+           t:h.c.t, don:h.c.don, tra:h.c.tra, xe:h.c.xe, base_p:h.c.base_p});
   /* Cong don rieng: LS chi giu 400 chuyen gan nhat nen khong dung lam nguon
      cho tab "da chay" duoc — chay 1000 chuyen se ve tu 400.                 */
   themChuyenDaChay(h.c);
@@ -939,7 +941,22 @@ function ketThuc(h){
   const l = document.getElementById('log');
   const d = document.createElement('div');
   d.className = 'lr';
-  d.innerHTML =
+  d.innerHTML = dongLog(h.c, h.k.lo, h.k.hi);
+  l.prepend(d);
+  while (l.children.length > 80) l.removeChild(l.lastChild);
+  veTiepVet(h, trong);
+}
+
+/* Mot dong nhat ky. Tach rieng de luc xem lai ban da luu ve lai duoc y het,
+   khong phai chep lai doan HTML lan thu hai.                              */
+function dongLog(c, lo, hi){
+  const trong = c.y >= lo && c.y <= hi;
+  const lech = (c.p - c.y) / c.y;
+  const mua = ['Rain','Drizzle','Thunderstorm'].includes(c.tt);
+  const caoDiem = (c.gio>=7&&c.gio<=9)||(c.gio>=17&&c.gio<=19);
+  /* Phai co '' + ngay sau return: de return dung mot minh cuoi dong thi
+     JS tu chen dau cham phay va ham tra ve undefined.                  */
+  return '' +
     '<span class="dot ' + (trong?'ok':'no') + '"></span>' +
     '<span style="color:var(--mut)">' + gioPhut(c.t) + '</span>' +
     '<span>' + tenNgan(c.don) + ' → ' + tenNgan(c.tra) + '</span>' +
@@ -954,16 +971,29 @@ function ketThuc(h){
       (Math.abs((c.hs_p-c.hs_y)/c.hs_y) <= .03 ? 'var(--ink)' : 'var(--orange)') +
       '">' + hs(c.hs_y) + '</b></span>' +
     '<span class="r" style="font-weight:700;color:var(--blue)">' + vnd(c.p) + '</span>' +
-    '<span class="r" style="color:var(--mut)">' + vnd(h.k.lo) + ' – ' + vnd(h.k.hi) + '</span>' +
+    '<span class="r" style="color:var(--mut)">' + vnd(lo) + ' – ' + vnd(hi) + '</span>' +
     '<span class="r" style="font-weight:700">' + vnd(c.y) + '</span>' +
     '<span class="r" style="font-weight:700;color:' +
       (Math.abs(lech) <= 0.15 ? 'var(--mut)' : 'var(--red)') + '">' +
       (lech >= 0 ? '+' : '−') + pct(Math.abs(lech)) + '</span>' +
     '<span style="color:' + (trong ? 'var(--green)' : 'var(--red)') + ';font-size:11.5px">' +
-      (trong ? 'trong khoảng' : (c.y > h.k.hi ? 'vượt trên' : 'thấp hơn')) + '</span>';
-  l.prepend(d);
-  while (l.children.length > 80) l.removeChild(l.lastChild);
+      (trong ? 'trong khoảng' : (c.y > hi ? 'vượt trên' : 'thấp hơn')) + '</span>';
+}
 
+/* Ve lai toan bo nhat ky tu LS — dung khi doi qua lai giua ban dang chay va
+   ban da luu. Moi nhat o tren, giu dung 80 dong nhu luc chay that.        */
+function veLaiLog(){
+  const l = document.getElementById('log');
+  if (!l) return;
+  const d = LS.slice(-80).reverse();
+  l.innerHTML = d.map(o => '<div class="lr">' + dongLog(o, o.lo, o.hi) + '</div>').join('');
+  const ct = document.getElementById('nk-ct');
+  if (ct) ct.textContent = XEM_LAI != null
+    ? 'bản đã lưu #' + XEM_LAI + ' · ' + d.length + ' chuyến gần nhất'
+    : 'mới nhất ở trên · 80 chuyến gần nhất';
+}
+
+function veTiepVet(h, trong){
   // Giữ lại vệt đường đã đi, tô theo trúng/trượt
   h.poly.setStyle({color: trong ? '#009E73' : '#D55E00', opacity:.18, weight:2.5});
   veo.push(h.poly);
@@ -2080,7 +2110,7 @@ function napTrangThai(goc){
   GIO_TU = a.GIO_TU; GIO_DEN = a.GIO_DEN; THU = a.THU; DUNG_SAU = a.DUNG_SAU;
   /* Xoa bo nho dem cua hai tab nhip gia, neu khong chung se ve lai so cu */
   Object.keys(NHIP).forEach(k => { NHIP[k].B = null; NHIP[k].hl = null; });
-  veStats(); veCard(null); veBieuDo();
+  veStats(); veCard(null); veBieuDo(); veLaiLog();
 }
 
 function veBangXemLai(){
