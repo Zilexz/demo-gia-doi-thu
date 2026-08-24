@@ -107,6 +107,14 @@ body.trai-dai .bd-hang.nhip .bang-cuon{height:clamp(190px,24vh,300px)}
 /* Khong co hai dong nay thi [hidden] thua display:flex ben duoi, banner
    va thanh nut cu dung do sau khi da an.                                */
 .bang-xem[hidden],.luu-thanh[hidden]{display:none}
+/* Dau hieu toan trang: o tab nao cung thay dang xem ban nao */
+.chip.xem-lai[hidden]{display:none}
+.chip.xem-lai{background:var(--blue);border-color:var(--blue);color:#fff;
+  font-weight:700;cursor:pointer;gap:7px}
+.chip.xem-lai:hover{filter:brightness(1.08)}
+.chip.xem-lai .x{opacity:.75;font-weight:400}
+body.dang-xem-lai .bd-khu{outline:2px solid #8fc4ee;outline-offset:3px;border-radius:12px}
+body.dang-xem-lai .tabs .tb.on{background:var(--blue);border-color:var(--blue)}
 .bang-xem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px;
   padding:7px 11px;border:1px solid #bcd9f2;background:#eaf4fd;border-radius:8px}
 .bang-xem .nhan-xem{font-size:10.5px;font-weight:700;letter-spacing:.5px;
@@ -271,6 +279,7 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
     <small>Phú Mỹ Hưng, Quận 7 · tập test <b id="c-n">—</b> chuyến,
       chưa từng dùng để huấn luyện</small></h1>
   <div class="chips">
+    <div class="chip xem-lai" id="chip-xem" hidden></div>
     <div class="chip live">Đang chạy <b id="c-xe">0</b> xe</div>
     <div class="chip">Đã xong <b id="c-xong">0</b><span id="c-tong"></span></div>
     <div class="chip">Coverage <b id="c-cov">—</b></div>
@@ -749,6 +758,13 @@ function xoaLop(h){
   [h.poly, h.daDi, h.xe, h.mA, h.mB].forEach(l => l && map.removeLayer(l));
 }
 function reset(){
+  /* Dang xem lai ma dat lai: phai thoat han, khong thi XEM_LAI con lai va
+     lan bam Chay ke tiep se khoi phuc trang thai cu, xoa mat lan dat lai. */
+  if (typeof XEM_LAI !== 'undefined' && XEM_LAI != null){
+    XEM_LAI = null; BAN_SONG = null;
+    document.body.classList.remove('dang-xem-lai');
+    veBangXemLai(); veBangLuu(); capNhatChipXem();
+  }
   hd.forEach(xoaLop); hd = [];
   veo.forEach(l => map.removeLayer(l)); veo = [];
   idx = 0; theoDoi = null; giuDen = 0; DUNG_SAU = DUNG_SAU_GOC; LS = [];
@@ -2095,10 +2111,14 @@ const honBaseline = b => b.bl > 0 ? 1 - b.sai/b.bl : 0;
 let XEM_LAI = null;      // stt dang xem · null = dang o ban chay that
 let BAN_SONG = null;     // cat giu ban that trong luc xem lai
 
-/* Dung han: bam nut tam dung thoi chua du, requestAnimationFrame van con
-   mot khung nua va khung do se ghi them mot chuyen vao trang thai.         */
+/* Dung mo phong lai.
+   TUYET DOI KHONG cancelAnimationFrame(loop) o day: tick() tu len lich lai
+   trong finally va la dong co chay suot doi trang, nut Chay chi bat tat co
+   `dangChay`. Huy no la dong co chet han, vao xem lai mot lan la khong chay
+   lai duoc nua cho den khi tai lai trang.
+   Chuyen dang chay do khong lam hong gi: veLaiVet() xoa chung, con anh chup
+   thi da duoc nhan ban truoc khi nap.                                      */
 function dungHan(){
-  if (loop != null){ cancelAnimationFrame(loop); loop = null; }
   dangChay = false;
   const b = document.getElementById('btn-play');
   if (b) b.textContent = '▶ Chạy liên tục';
@@ -2129,6 +2149,20 @@ function napTrangThai(goc){
   veStats(); veCard(null); veBieuDo(); veLaiLog(); veLaiVet();
 }
 
+/* Chip tren thanh tieu de — bam vao la quay lai ban dang chay */
+function capNhatChipXem(){
+  const c = document.getElementById('chip-xem');
+  if (!c) return;
+  const b = XEM_LAI == null ? null : banTheoStt(XEM_LAI);
+  c.hidden = !b;
+  if (!b) return;
+  c.innerHTML = 'Đang xem bản #' + b.stt + ' · ' + b.ten_gio + ' · ' + b.ten_thu +
+                ' <span class="x">✕ thoát</span>';
+  c.onclick = thoatXemLai;
+  c.title = 'Mọi số liệu và biểu đồ đang là của bản #' + b.stt
+          + '. Bấm để quay lại bản đang chạy.';
+}
+
 function veBangXemLai(){
   const b = XEM_LAI == null ? null : banTheoStt(XEM_LAI);
   const o = document.getElementById('bang-xem');
@@ -2152,7 +2186,7 @@ function xemBanLuu(stt){
   XEM_LAI = stt;
   napTrangThai(b.anh);
   document.body.classList.add('dang-xem-lai');
-  veBangXemLai();
+  veBangXemLai(); capNhatChipXem();
   veBangLuu();
   document.getElementById('ket-qua').innerHTML =
     '<b style="color:var(--blue)">Đang xem lại bản #' + stt + '</b> — ' +
@@ -2167,7 +2201,7 @@ function thoatXemLai(){
   if (BAN_SONG) napTrangThai(BAN_SONG);
   BAN_SONG = null;
   document.body.classList.remove('dang-xem-lai');
-  veBangXemLai();
+  veBangXemLai(); capNhatChipXem();
   veBangLuu();
   document.getElementById('ket-qua').innerHTML =
     '<span style="color:var(--mut)">Đã quay lại bản đang chạy.</span>';
