@@ -2286,12 +2286,19 @@ function capNhatNutSS(){
 }
 
 /* ── So sánh các bản đã chọn ──────────────────────────────────────── */
+/* Bo chi so danh voi baseline: demo cho thay bien dong gia theo gio va do tin
+   cay cua khoang, so voi baseline khong phuc vu ca hai.
+   "Lech khoi khoang" dem theo SO CHUYEN — ty le thi coverage da noi (hai cai
+   bu nhau), con so tuyet doi moi cho biet quy mo that.                     */
+const lechKhoang = b => b.tren + b.duoi;
+
 const CHI_SO_SS = [
-  {ten:'Coverage',        lay:b => b.cov,          dd:pct,  tot:'gan_muc', diem:true},
-  {ten:'Giá sai TB',      lay:b => b.sai,          dd:pct,  tot:'thap',    diem:true},
-  {ten:'Rộng khoảng TB',  lay:b => b.rong,         dd:v => vnd(v)+'đ', tot:'thap'},
-  {ten:'Sai hệ số nhân',  lay:b => b.hs,           dd:pct,  tot:'thap',    diem:true},
-  {ten:'Hơn baseline',    lay:b => honBaseline(b), dd:pct,  tot:'cao',     diem:true},
+  {ten:'Coverage',          lay:b => b.cov,      dd:pct,  tot:'gan_muc', diem:true},
+  {ten:'Lệch khỏi khoảng',  lay:lechKhoang,      dd:v => Math.round(v) + ' chuyến',
+                            tot:'thap', dem:true},
+  {ten:'Giá sai TB',        lay:b => b.sai,      dd:pct,  tot:'thap',    diem:true},
+  {ten:'Rộng khoảng TB',    lay:b => b.rong,     dd:v => vnd(v)+'đ',     tot:'thap'},
+  {ten:'Sai hệ số nhân',    lay:b => b.hs,       dd:pct,  tot:'thap',    diem:true},
 ];
 
 function soSanhLuu(){
@@ -2335,7 +2342,9 @@ function veBangSS(ds){
     });
     if (ds.length === 2){
       const d = cs.lay(ds[1]) - cs.lay(moc);
-      const txt = cs.diem
+      const txt = cs.dem
+        ? (d >= 0 ? '+' : '−') + Math.round(Math.abs(d)) + ' chuyến'
+        : cs.diem
         ? (d >= 0 ? '+' : '−') + Math.abs(d*100).toFixed(1).replace('.', ',') + ' điểm'
         : (d >= 0 ? '+' : '−') + Math.abs(d/cs.lay(moc)*100).toFixed(1).replace('.', ',') + '%';
       const tot = cs.tot === 'thap' ? d < 0
