@@ -483,12 +483,7 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
         </div>
       </div>
       <div class="row" style="margin-bottom:8px">
-        <label class="lbl">Hiệu chỉnh</label>
-        <div class="seg" id="seg-hc">
-          <button data-v="chung">q chung</button>
-          <button data-v="band" class="on">theo band</button>
-        </div>
-        <label class="lbl" style="min-width:38px;margin-left:2px">Nhóm</label>
+        <label class="lbl">Nhóm</label>
         <div class="seg" id="seg-nhom">
           <button data-v="dai_dien" class="on">đại diện</button>
           <button data-v="dat">&gt;300k</button>
@@ -697,7 +692,10 @@ function duongCong(a, b, n=52){
 }
 
 /* ── Tham số UQ ─────────────────────────────────────────────────────── */
-let MUC = 0.9, HC = 'band', TOC = 2, MAX_XE = 4;
+let MUC = 0.9, TOC = 2, MAX_XE = 4;
+/* Hieu chinh LUON theo band gia — nut chon da bo. Giu bien de ban luu cu
+   (co the mang HC='chung') van doc duoc, nhung khong bao gio doi nua. */
+const HC = 'band';
 /* Dung sau bao nhieu chuyen: so duong = moc cu the · 0 = het mau · -1 = chay mai
    Kep theo so chuyen CO THAT trong khung gio: chon 17–19h ma doi chay 200 chuyen
    trong khi khung do chi co 108 chuyen thi se chay lai chinh chung, thanh ra
@@ -1499,7 +1497,7 @@ function veRong(){
   const co2 = g.map((o,i) => ({...o, i})).filter(o => o.n >= N_TOI_THIEU);
   const r = co2.reduce((a,b) => b.q > a.q ? b : a);
   document.getElementById('bd-c2-ct').innerHTML =
-    (HC === 'band' ? 'hiệu chỉnh riêng từng band' : 'một tỷ lệ chung mọi band') +
+    'hiệu chỉnh riêng từng band' +
     ' · rộng nhất <b>' + nhanAn(ten[r.i]) + ' ±' + pct(r.q) + '</b>';
 }
 
@@ -2117,7 +2115,7 @@ function luuBanChay(){
     ten_gio: caNgay() ? 'cả ngày'
              : hai(GIO_TU) + 'h–' + hai(GIO_DEN) + 'h',
     ten_thu: THU === null ? 'cả tuần' : TEN_THU[THU],
-    muc: MUC, hc: HC === 'band' ? 'theo band' : 'q chung',
+    muc: MUC, hc: 'theo band',   /* giu de ban luu cu doc duoc */
     n: S.n, cov: S.trong/S.n, sai: S.sai/S.n, rong: S.rong/S.n,
     hs: S.sai_hs/S.n, bl: S.sai_bl/S.n, tren: S.tren, duoi: S.duoi,
     /* Anh chup de XEM LAI. Khong co ba thu nay thi chi doc duoc hang so,
@@ -2181,7 +2179,7 @@ const nhanBan = a => ({
 function napTrangThai(goc){
   const a = nhanBan(goc);
   LS = a.LS; S = a.S; G_CHAY = a.G;
-  MUC = a.MUC; HC = a.HC; NHOM = a.NHOM;
+  MUC = a.MUC; NHOM = a.NHOM;   /* HC co dinh 'band', xem khai bao */
   GIO_TU = a.GIO_TU; GIO_DEN = a.GIO_DEN; THU = a.THU; DUNG_SAU = a.DUNG_SAU;
   /* Xoa bo nho dem cua hai tab nhip gia, neu khong chung se ve lai so cu */
   Object.keys(NHIP).forEach(k => { NHIP[k].B = null; NHIP[k].hl = null; });
@@ -2211,7 +2209,7 @@ function veBangXemLai(){
   o.innerHTML =
     '<span class="nhan-xem">ĐANG XEM LẠI BẢN #' + b.stt + '</span>' +
     '<span class="ct-xem">' + b.nhom + ' · ' + b.ten_gio + ' · ' + b.ten_thu +
-    ' · mức ' + pct(b.muc) + ' · ' + b.hc + ' · <b>' + b.n + '</b> chuyến</span>' +
+    ' · mức ' + pct(b.muc) + ' · <b>' + b.n + '</b> chuyến</span>' +
     '<button class="nut-ss phu" id="nut-thoat-xem" type="button">← Quay lại bản đang chạy</button>';
   document.getElementById('nut-thoat-xem').onclick = thoatXemLai;
 }
@@ -2263,7 +2261,7 @@ function veBangLuu(){
   if (thanh) thanh.hidden = false;
 
   const h = ['<tr><th class="ck"></th><th>#</th><th>Nhóm</th><th>Khung giờ</th><th>Thứ</th>' +
-             '<th>Mức</th><th>Hiệu chỉnh</th>' +
+             '<th>Mức</th>' +
              '<th>n</th><th>Coverage</th><th>Sai TB</th><th>Rộng khoảng</th>' +
              '<th>Sai hệ số</th><th>Hơn baseline</th><th>Trượt ↑/↓</th></tr>'];
   BAN_LUU.forEach(b => {
@@ -2278,7 +2276,7 @@ function veBangLuu(){
         (chon ? ' checked' : '') + '></td>' +
       '<td>' + b.stt + '</td><td>' + b.nhom + '</td>' +
       '<td>' + b.ten_gio + '</td><td>' + b.ten_thu + '</td>' +
-      '<td>' + pct(b.muc) + '</td><td>' + b.hc + '</td><td>' + b.n + '</td>' +
+      '<td>' + pct(b.muc) + '</td><td>' + b.n + '</td>' +
       '<td style="color:' + (dat ? 'var(--green)' : 'var(--orange)') + '">' +
         pct(b.cov) + '</td>' +
       '<td>' + pct(b.sai) + '</td><td>' + vnd(b.rong) + 'đ</td>' +
@@ -2352,7 +2350,7 @@ function soSanhLuu(){
   document.getElementById('the-ss').hidden = false;
   veBangSS(ds);
   veCotSS(ds);
-  const khacCH = new Set(ds.map(b => b.muc + '|' + b.hc + '|' + b.nhom)).size > 1;
+  const khacCH = new Set(ds.map(b => b.muc + '|' + b.nhom)).size > 1;
   document.getElementById('bd-ss-ct').innerHTML =
     'khung <b>' + ds[0].ten_gio + '</b> · ' +
     ds.map(b => '#' + b.stt + ' ' + b.ten_thu).join(' vs ') +
@@ -2625,11 +2623,11 @@ loop = requestAnimationFrame(tick);
 
 /* ── Ghi chú nhóm ───────────────────────────────────────────────────── */
 const GHI_CHU = {
-  dai_dien: '<b>Mẫu ngẫu nhiên từ tập test</b> — cơ cấu giống thực tế. Nhóm này hầu như ' +
-            'không có chuyến đắt nên hai cách hiệu chỉnh cho kết quả gần bằng nhau.',
-  dat: '<b>Toàn bộ</b> chuyến có giá dự đoán &gt;300k trong tập test. Một tỷ lệ chung ' +
-       '(±30%) không đủ cho nhóm này — nó cần ±41%. Bấm qua lại <b>q chung</b> ↔ ' +
-       '<b>theo band giá</b> để thấy coverage nhảy từ ~84% lên ~91%.'
+  dai_dien: '<b>Mẫu ngẫu nhiên từ tập test</b> — cơ cấu giá giống thực tế, nên nhóm ' +
+            'chuyến đắt chỉ chiếm tỷ lệ nhỏ đúng như ngoài đời.',
+  dat: '<b>Toàn bộ</b> chuyến có giá dự đoán &gt;300k trong tập test. Nhóm này khó dự ' +
+       'đoán nhất nên được cấp khoảng rộng hơn hẳn — <b>±41%</b> thay vì ±30% như các ' +
+       'nhóm khác, nhờ vậy vẫn giữ được mức bao phủ đã cam kết.'
 };
 const GIAI_THICH_RAI =
   'Điểm đón/trả được rải ngẫu nhiên trong bán kính ' + BK + 'm quanh mỗi khu — chỉ để ' +
@@ -2746,7 +2744,6 @@ document.getElementById('sel-dung').onchange = e => {
   DUNG_SAU = DUNG_SAU_GOC = +e.target.value; doiThamSo();
 };
 seg('seg-muc',  v => { MUC = +v; doiThamSo(); });
-seg('seg-hc',   v => { HC = v;   doiThamSo(); });
 seg('seg-nhom', v => { NHOM = v; locNguon(); veGhiChu(); doiThamSo(); });
 seg('seg-gio',  v => { const [a, b] = v.split('-').map(Number);
                        dungKhung(a, b, false); });
