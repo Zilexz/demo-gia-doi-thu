@@ -92,6 +92,12 @@ body.trai-dai .bd-hang.nhip .bang-cuon{height:clamp(190px,24vh,300px)}
 #b-da-luu .bang-cuon{height:auto;max-height:100%;flex:1}
 #b-da-luu{grid-template-rows:auto auto;align-content:start}
 #the-ss canvas{height:clamp(120px,17vh,210px)}
+.ss-duong{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.ss-duong h4{margin:0 0 4px;font-size:12.5px;font-weight:700;color:#1b2330;
+  text-transform:uppercase;letter-spacing:.4px}
+.ss-duong h4 em{font-style:normal;font-weight:400;color:#75828f;
+  text-transform:none;letter-spacing:0;margin-left:6px}
+@media (max-width:900px){.ss-duong{grid-template-columns:1fr}}
 #b-nhip-chay{grid-template-columns:repeat(3,1fr)}
 #the-ss .bang-cuon{flex:0 0 auto;max-height:none}
 .luu-thanh{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:6px}
@@ -429,6 +435,16 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
         <h3><span class="tt">So sánh các bản đã chọn</span>
           <em id="bd-ss-ct">—</em></h3>
         <canvas id="bd-ss"></canvas>
+        <div class="ss-duong">
+          <div>
+            <h4>Giá mỗi km theo thời gian <em id="bd-ss-km-ct">—</em></h4>
+            <canvas id="bd-ss-km"></canvas>
+          </div>
+          <div>
+            <h4>Hệ số nhân theo thời gian <em id="bd-ss-hs-ct">—</em></h4>
+            <canvas id="bd-ss-hs"></canvas>
+          </div>
+        </div>
         <div class="bang-cuon"><table id="bang-ss"></table></div>
       </div>
       <div class="bd">
@@ -2349,6 +2365,10 @@ function soSanhLuu(){
   document.getElementById('the-ss').hidden = false;
   veBangSS(ds);
   veCotSS(ds);
+  veDuongSS('bd-ss-km', 'bd-ss-km-ct', ds, o => o.gkm_y,
+            v => vnd(v) + 'đ', gonNgan);
+  veDuongSS('bd-ss-hs', 'bd-ss-hs-ct', ds, o => o.hs_y,
+            v => v.toFixed(3).replace('.', ','), v => v.toFixed(2).replace('.', ','));
   const khacCH = new Set(ds.map(b => b.muc + '|' + (b.ten_thang || ''))).size > 1;
   document.getElementById('bd-ss-ct').innerHTML =
     'khung <b>' + ds[0].ten_gio + '</b> · ' +
@@ -2406,6 +2426,98 @@ function veBangSS(ds){
 
 /* Cột nhóm: mỗi chỉ số một cụm, mỗi bản một cột. Thang riêng từng cụm vì
    đơn vị khác nhau — %, đồng, không quy về chung được.                    */
+/* ── Hai biểu đồ đường trong thẻ So sánh ────────────────────────────
+   Mục đích: cùng một khung giờ, hai bản (vd T2 và T7) dao động khác nhau
+   thế nào. Dùng lại `anh.G` đã lưu nên không phải chạy lại chuyến nào.
+
+   Bước gộp lấy THÔ NHẤT trong các bản đang so — nếu mỗi bản một bước thì
+   trục hoành không khớp và hai đường không so được với nhau.            */
+const MAU_SS = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#D55E00'];
+
+function buocChungSS(ds){
+  return Math.max(...ds.map(b => chonBuoc(b.anh.G)));
+}
+
+function veDuongSS(idCv, idCt, ds, lay, dinh_dang, nhan_truc){
+  const cv = document.getElementById(idCv); const k = khungVe(cv); if (!k) return;
+  k.TRAI = 44; k.TREN = 12; k.DUOI = 26;
+  k.Y0 = k.h - k.DUOI;
+  const c = k.c;
+
+  const buoc = buocChungSS(ds);
+  const loat = ds.map(b => chotO(gopO(b.anh.G, buoc)));
+
+  /* Chi ve khoang gio THUC SU co chuyen, khong ve trong 24h */
+  let tu = Infinity, den = -1;
+  loat.forEach(B => B.forEach((o, i) => {
+    if (o.n){ if (i < tu) tu = i; if (i > den) den = i; }
+  }));
+  if (den < 0){ trong(k, 'chưa có dữ liệu'); return; }
+
+  const so = den - tu + 1;
+  k.RONG = (k.w - k.TRAI - 10) / so;
+  k.X = i => k.TRAI + (i - tu + .5) * k.RONG;
+
+  const vs = [];
+  loat.forEach(B => B.forEach(o => { if (o.n) vs.push(lay(o)); }));
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const dm = (hi - lo) || Math.abs(hi) * .1 || 1;
+  lo -= dm * .25; hi += dm * .25;
+  const Y = v => k.TREN + (1 - (v - lo)/(hi - lo)) * (k.Y0 - k.TREN);
+
+  luoiNgang(k, lo, hi, Y, nhan_truc || dinh_dang, 4);
+
+  loat.forEach((B, j) => {
+    const co = B.map((o, i) => ({i, ...o})).filter(o => o.n && o.i >= tu && o.i <= den);
+    if (!co.length) return;
+    const mau = MAU_SS[j % MAU_SS.length];
+    c.strokeStyle = mau; c.lineWidth = 2.2; c.beginPath();
+    co.forEach((o, q) => q ? c.lineTo(k.X(o.i), Y(lay(o)))
+                           : c.moveTo(k.X(o.i), Y(lay(o))));
+    c.stroke();
+    c.fillStyle = mau;
+    co.forEach(o => { c.beginPath();
+      c.arc(k.X(o.i), Y(lay(o)), co.length > 30 ? 1.8 : 2.6, 0, 7); c.fill(); });
+  });
+
+  /* Truc hoanh: nhan gio, thua cho thi in nhieu moc */
+  c.strokeStyle = '#d4dbe4'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(k.TRAI, k.Y0); c.lineTo(k.w - 10, k.Y0); c.stroke();
+  const vua = Math.max(2, Math.floor((k.w - k.TRAI - 10) / 46));
+  const nhay = Math.max(1, Math.ceil(so / vua));
+  c.fillStyle = '#7b8798'; c.textAlign = 'center';
+  c.font = '9px "Segoe UI",system-ui,sans-serif';
+  for (let i = tu; i <= den; i += nhay){
+    c.fillText(nhanO({phut: i * buoc}, buoc), k.X(i), k.h - 13);
+  }
+
+  /* Chu giai */
+  let x = k.TRAI;
+  c.textAlign = 'left'; c.font = '9px "Segoe UI",system-ui,sans-serif';
+  ds.forEach((b, j) => {
+    c.fillStyle = MAU_SS[j % MAU_SS.length];
+    c.fillRect(x, k.h - 7, 8, 6);
+    c.fillStyle = '#6b7787';
+    const t = '#' + b.stt + ' ' + b.ten_thu +
+              (b.ten_thang && b.ten_thang !== 'cả kỳ' ? ' ' + b.ten_thang : '');
+    c.fillText(t, x + 11, k.h - 2);
+    x += 11 + c.measureText(t).width + 12;
+  });
+  c.font = '10px "Segoe UI",system-ui,sans-serif';
+
+  /* Ghi chu: chenh lech cao nhat giua cac ban tai cung mot moc */
+  let khac = 0, moc = null;
+  for (let i = tu; i <= den; i++){
+    const v = loat.map(B => B[i]).filter(o => o && o.n).map(lay);
+    if (v.length < 2) continue;
+    const d = Math.max(...v) - Math.min(...v);
+    if (d > khac){ khac = d; moc = i; }
+  }
+  document.getElementById(idCt).innerHTML = 'gộp <b>' + tenBuoc(buoc) + '</b>' +
+    (moc === null ? '' : ' · chênh nhiều nhất lúc <b>' +
+      nhanO({phut: moc * buoc}, buoc) + '</b> — ' + dinh_dang(khac));
+}
+
 function veCotSS(ds){
   const cv = document.getElementById('bd-ss'); const k = khungVe(cv); if (!k) return;
   const c = k.c;
