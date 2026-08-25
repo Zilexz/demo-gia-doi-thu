@@ -482,13 +482,6 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
           <button data-v="0.9" class="on">90%</button>
         </div>
       </div>
-      <div class="row" style="margin-bottom:8px">
-        <label class="lbl">Nhóm</label>
-        <div class="seg" id="seg-nhom">
-          <button data-v="dai_dien" class="on">đại diện</button>
-          <button data-v="dat">&gt;300k</button>
-        </div>
-      </div>
       <div class="row">
         <label class="lbl">Giờ</label>
         <div class="seg" id="seg-gio">
@@ -511,6 +504,10 @@ select.sel{font:inherit;font-size:13px;border:1px solid var(--line);background:#
           <button data-v="5">T6</button><button data-v="6">T7</button>
           <button data-v="0">CN</button>
         </div>
+      </div>
+      <div class="row">
+        <label class="lbl">Tháng</label>
+        <div class="seg" id="seg-thang"></div>
         <button id="btn-luu" title="Lưu kết quả hiện tại để đối chiếu">💾 Lưu bản chạy</button>
       </div>
       <div class="note" id="ghi-chu-nhom"></div>
@@ -598,16 +595,14 @@ function bungKho(z){
 
 const _t0 = performance.now();
 const TAT_CA = bungKho(KHO_NEN) || KHO_CU.dai_dien.concat(KHO_CU.dat);
-/* Nhóm ">300k" chỉ là một lát của cùng kho, không lưu trùng dữ liệu */
-const KHO = {dai_dien: TAT_CA, dat: TAT_CA.filter(c => c.p > 300000)};
 console.log(`Bung ${TAT_CA.length.toLocaleString('vi-VN')} chuyến trong `
-          + `${(performance.now()-_t0).toFixed(0)}ms · >300k: ${KHO.dat.length}`);
+          + `${(performance.now()-_t0).toFixed(0)}ms`);
 
-let NHOM = 'dai_dien';
 
 /* ── Lọc theo khung giờ ─────────────────────────────────────────────────
    GIO_TU > GIO_DEN nghĩa là khung vắt qua nửa đêm (vd 22 → 5). */
 let GIO_TU = 0, GIO_DEN = 23, THU = null, LOC = [];   // THU = null: cả tuần
+let THANG = null;   // null = cả kỳ; khác null = 1..12 theo giờ Việt Nam
 const trongKhung = g => GIO_TU <= GIO_DEN
   ? (g >= GIO_TU && g <= GIO_DEN)
   : (g >= GIO_TU || g <= GIO_DEN);
@@ -623,7 +618,9 @@ function tronDeu(a, hat){
 }
 
 function locNguon(){
-  LOC = KHO[NHOM].filter(c => trongKhung(c.gio) && (THU === null || thuCua(c) === THU));
+  LOC = TAT_CA.filter(c => trongKhung(c.gio)
+    && (THU   === null || thuCua(c)   === THU)
+    && (THANG === null || thangCua(c) === THANG));
   /* Tap test xep theo THOI GIAN. Chay tuan tu tu dau thi vai tram chuyen dau deu
      roi vao cung mot ngay, cung mot khung gio -> thong ke lech nang. Tron deu de
      moi lan chay la mot mau ngau nhien trai deu ca tap.                        */
@@ -632,7 +629,8 @@ function locNguon(){
 const nguon = () => LOC;
 const tenKhung = () => (caNgay() ? 'cả ngày'
   : `${String(GIO_TU).padStart(2,'0')}h–${String(GIO_DEN).padStart(2,'0')}h`)
-  + (THU === null ? '' : ' · ' + TEN_THU[THU]);
+  + (THU === null ? '' : ' · ' + TEN_THU[THU])
+  + (THANG === null ? '' : ' · tháng ' + THANG);
 
 /* ── Bản đồ ─────────────────────────────────────────────────────────── */
 const map = L.map('map', {zoomControl:true, attributionControl:true})
@@ -735,6 +733,7 @@ const TT_VN = {Rain:['Mưa','#0072B2'], Drizzle:['Mưa nhẹ','#0072B2'],
                Fog:['Sương','#9aa5b4'], Haze:['Mù','#9aa5b4']};
 const ttVN = t => TT_VN[t] || [t, '#7b8798'];
 const thuCua = c => ngayVN(c.t).getUTCDay();      // 0 = CN
+const thangCua = c => ngayVN(c.t).getUTCMonth() + 1;   // 1..12, giờ Việt Nam
 
 function gioVN(t){
   const d = new Date(t.replace(' ', 'T') + 'Z');
@@ -1504,7 +1503,7 @@ function veRong(){
 /* ══ Nhịp giá theo thời gian ═════════════════════════════════════════════
    HAI tab dùng chung bộ vẽ này, khác nhau đúng ở NGUỒN SỐ:
 
-     nhip-gio  "cả tập"   — gom thẳng KHO[NHOM], không cần chạy chuyến nào.
+     nhip-gio  "cả tập"   — gom thẳng TAT_CA, không cần chạy chuyến nào.
                             Đây là đặc tính của DỮ LIỆU nên có ngay khi mở.
                             KHÔNG lọc theo khung giờ/thứ: luôn hiện đủ 24 giờ,
                             khung đang chọn chỉ được tô nền để đối chiếu.
@@ -1603,7 +1602,7 @@ const themChuyenDaChay = c => gomChuyen(G_CHAY, c);
 
 function goc5CaTap(){
   const g = oRong();
-  KHO[NHOM].forEach(c => gomChuyen(g, c));
+  TAT_CA.forEach(c => gomChuyen(g, c));
   return g;
 }
 
@@ -2109,7 +2108,7 @@ function luuBanChay(){
   }
   BAN_LUU.push({
     stt: ++STT_LUU,
-    nhom: NHOM === 'dai_dien' ? 'đại diện' : '>300k',
+    ten_thang: THANG === null ? 'cả kỳ' : 'tháng ' + THANG,
     khung: tenKhung(),
     gio_tu: GIO_TU, gio_den: GIO_DEN, thu: THU,
     ten_gio: caNgay() ? 'cả ngày'
@@ -2124,7 +2123,7 @@ function luuBanChay(){
       LS: LS.map(o => Object.assign({}, o)),
       S:  Object.assign({}, S),
       G:  G_CHAY.map(o => Object.assign({}, o, {tt: Object.assign({}, o.tt)})),
-      MUC: MUC, HC: HC, NHOM: NHOM,
+      MUC: MUC, THANG: THANG,
       GIO_TU: GIO_TU, GIO_DEN: GIO_DEN, THU: THU, DUNG_SAU: DUNG_SAU
     },
   });
@@ -2162,7 +2161,7 @@ function dungHan(){
 }
 
 const chupSong = () => ({
-  LS: LS, S: S, G: G_CHAY, MUC: MUC, HC: HC, NHOM: NHOM,
+  LS: LS, S: S, G: G_CHAY, MUC: MUC, THANG: THANG,
   GIO_TU: GIO_TU, GIO_DEN: GIO_DEN, THU: THU, DUNG_SAU: DUNG_SAU
 });
 
@@ -2172,14 +2171,14 @@ const nhanBan = a => ({
   LS: a.LS.map(o => Object.assign({}, o)),
   S:  Object.assign({}, a.S),
   G:  a.G.map(o => Object.assign({}, o, {tt: Object.assign({}, o.tt)})),
-  MUC: a.MUC, HC: a.HC, NHOM: a.NHOM,
+  MUC: a.MUC, THANG: a.THANG ?? null,
   GIO_TU: a.GIO_TU, GIO_DEN: a.GIO_DEN, THU: a.THU, DUNG_SAU: a.DUNG_SAU
 });
 
 function napTrangThai(goc){
   const a = nhanBan(goc);
   LS = a.LS; S = a.S; G_CHAY = a.G;
-  MUC = a.MUC; NHOM = a.NHOM;   /* HC co dinh 'band', xem khai bao */
+  MUC = a.MUC; THANG = a.THANG;   /* HC co dinh 'band', xem khai bao */
   GIO_TU = a.GIO_TU; GIO_DEN = a.GIO_DEN; THU = a.THU; DUNG_SAU = a.DUNG_SAU;
   /* Xoa bo nho dem cua hai tab nhip gia, neu khong chung se ve lai so cu */
   Object.keys(NHIP).forEach(k => { NHIP[k].B = null; NHIP[k].hl = null; });
@@ -2208,7 +2207,7 @@ function veBangXemLai(){
   if (!b) return;
   o.innerHTML =
     '<span class="nhan-xem">ĐANG XEM LẠI BẢN #' + b.stt + '</span>' +
-    '<span class="ct-xem">' + b.nhom + ' · ' + b.ten_gio + ' · ' + b.ten_thu +
+    '<span class="ct-xem">' + (b.ten_thang || 'cả kỳ') + ' · ' + b.ten_gio + ' · ' + b.ten_thu +
     ' · mức ' + pct(b.muc) + ' · <b>' + b.n + '</b> chuyến</span>' +
     '<button class="nut-ss phu" id="nut-thoat-xem" type="button">← Quay lại bản đang chạy</button>';
   document.getElementById('nut-thoat-xem').onclick = thoatXemLai;
@@ -2260,7 +2259,7 @@ function veBangLuu(){
   }
   if (thanh) thanh.hidden = false;
 
-  const h = ['<tr><th class="ck"></th><th>#</th><th>Nhóm</th><th>Khung giờ</th><th>Thứ</th>' +
+  const h = ['<tr><th class="ck"></th><th>#</th><th>Tháng</th><th>Khung giờ</th><th>Thứ</th>' +
              '<th>Mức</th>' +
              '<th>n</th><th>Coverage</th><th>Sai TB</th><th>Rộng khoảng</th>' +
              '<th>Sai hệ số</th><th>Hơn baseline</th><th>Trượt ↑/↓</th></tr>'];
@@ -2274,7 +2273,7 @@ function veBangLuu(){
          + '>' +
       '<td class="ck"><input type="checkbox" class="ck-luu" data-stt="' + b.stt + '"' +
         (chon ? ' checked' : '') + '></td>' +
-      '<td>' + b.stt + '</td><td>' + b.nhom + '</td>' +
+      '<td>' + b.stt + '</td><td>' + (b.ten_thang || 'cả kỳ') + '</td>' +
       '<td>' + b.ten_gio + '</td><td>' + b.ten_thu + '</td>' +
       '<td>' + pct(b.muc) + '</td><td>' + b.n + '</td>' +
       '<td style="color:' + (dat ? 'var(--green)' : 'var(--orange)') + '">' +
@@ -2350,7 +2349,7 @@ function soSanhLuu(){
   document.getElementById('the-ss').hidden = false;
   veBangSS(ds);
   veCotSS(ds);
-  const khacCH = new Set(ds.map(b => b.muc + '|' + b.nhom)).size > 1;
+  const khacCH = new Set(ds.map(b => b.muc + '|' + (b.ten_thang || ''))).size > 1;
   document.getElementById('bd-ss-ct').innerHTML =
     'khung <b>' + ds[0].ten_gio + '</b> · ' +
     ds.map(b => '#' + b.stt + ' ' + b.ten_thu).join(' vs ') +
@@ -2622,13 +2621,9 @@ function tick(now){
 loop = requestAnimationFrame(tick);
 
 /* ── Ghi chú nhóm ───────────────────────────────────────────────────── */
-const GHI_CHU = {
-  dai_dien: '<b>Mẫu ngẫu nhiên từ tập test</b> — cơ cấu giá giống thực tế, nên nhóm ' +
-            'chuyến đắt chỉ chiếm tỷ lệ nhỏ đúng như ngoài đời.',
-  dat: '<b>Toàn bộ</b> chuyến có giá dự đoán &gt;300k trong tập test. Nhóm này khó dự ' +
-       'đoán nhất nên được cấp khoảng rộng hơn hẳn — <b>±41%</b> thay vì ±30% như các ' +
-       'nhóm khác, nhờ vậy vẫn giữ được mức bao phủ đã cam kết.'
-};
+const GHI_CHU_CHUNG =
+  '<b>Toàn bộ tập test</b> — cơ cấu giá giống thực tế. Khoảng tin cậy được hiệu chỉnh ' +
+  'riêng cho từng band giá, nên nhóm chuyến đắt vẫn giữ được mức bao phủ đã cam kết.';
 const GIAI_THICH_RAI =
   'Điểm đón/trả được rải ngẫu nhiên trong bán kính ' + BK + 'm quanh mỗi khu — chỉ để ' +
   'nhìn cho sinh động. Dữ liệu gốc chỉ có 3 toạ độ cố định nên quãng đường và giá ' +
@@ -2650,7 +2645,7 @@ function veGhiChu(){
     : n < 30
       ? '<b style="color:var(--orange)">Khung ' + tenKhung() + ' chỉ có ' + n +
         ' chuyến</b> — quá ít, coverage sẽ rất nhiễu.'
-      : caNgay() ? GHI_CHU[NHOM]
+      : caNgay() ? GHI_CHU_CHUNG
                  : '<b>Khung ' + tenKhung() + '</b> — chỉ mô phỏng chuyến trong khung này.';
   const canh_ngay = (THU !== null && nd <= 1)
     ? '<br><b style="color:var(--red)">Lưu ý:</b> tập test chỉ trải trên ít ngày, nên '
@@ -2744,7 +2739,17 @@ document.getElementById('sel-dung').onchange = e => {
   DUNG_SAU = DUNG_SAU_GOC = +e.target.value; doiThamSo();
 };
 seg('seg-muc',  v => { MUC = +v; doiThamSo(); });
-seg('seg-nhom', v => { NHOM = v; locNguon(); veGhiChu(); doiThamSo(); });
+/* ── Nút chọn tháng: dựng từ chính dữ liệu ───────────────────────────
+   Không viết cứng 1/2/3 — đổi tập test thì nút tự đổi theo. Tháng nào
+   không có chuyến nào thì không hiện nút, đỡ bấm vào rồi trống trơn. */
+function dungNutThang(){
+  const co = [...new Set(TAT_CA.map(thangCua))].sort((a, b) => a - b);
+  const o = document.getElementById('seg-thang');
+  o.innerHTML = '<button data-v="" class="on">cả kỳ</button>' +
+    co.map(m => '<button data-v="' + m + '">tháng ' + m + '</button>').join('');
+}
+dungNutThang();
+seg('seg-thang', v => { THANG = v === '' ? null : +v; locNguon(); veGhiChu(); doiThamSo(); });
 seg('seg-gio',  v => { const [a, b] = v.split('-').map(Number);
                        dungKhung(a, b, false); });
 seg('seg-thu',  v => { THU = v === '' ? null : +v;
